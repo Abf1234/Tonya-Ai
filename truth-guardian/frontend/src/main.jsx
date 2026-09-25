@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { BandwidthProvider } from './context/BandwidthContext';
+import { isAppwriteConfigured, pingAppwrite } from './services/appwrite';
 import './index.css';
 
 createRoot(document.getElementById('root')).render(
@@ -18,3 +19,20 @@ createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </StrictMode>,
 );
+
+async function checkAppwriteConnection() {
+  if (!isAppwriteConfigured) {
+    console.warn('[Appwrite] SDK is not configured; skipping connection check.');
+    return;
+  }
+
+  try {
+    await pingAppwrite();
+    console.info('[Appwrite] connection check succeeded.');
+  } catch {
+    // Keep the app available while surfacing the setup failure in the console.
+    console.warn('[Appwrite] connection check failed.');
+  }
+}
+
+void checkAppwriteConnection();

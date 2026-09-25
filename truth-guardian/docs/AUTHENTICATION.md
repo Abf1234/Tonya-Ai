@@ -11,6 +11,8 @@ Truth Guardian uses Appwrite as the browser identity provider. Django does not r
 5. A future protected Django request may opt into `withAppwriteAuth()`. The Axios interceptor asks Appwrite for a 15-minute client JWT and sends it as `Authorization: Bearer <jwt>`.
 6. Django validates the JWT through Appwrite's server SDK and creates only an `AppwritePrincipal`; it does not create a Django user or session.
 
+On startup, `src/main.jsx` invokes `pingAppwrite()` once. The check is non-blocking, logs a clear success or failure message, and does not prevent the UI from rendering.
+
 The current UI does not register accounts, upload evidence, or call protected domain endpoints. The supplied Appwrite database ID is reserved for a future table integration, and the supplied storage bucket is configured only for that future workflow; PostgreSQL remains the authoritative domain database and the bucket must stay private.
 
 ## Configuration

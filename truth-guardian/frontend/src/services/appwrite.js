@@ -29,6 +29,21 @@ if (isAppwriteConfigured) {
 export const account = isAppwriteConfigured ? new Account(appwriteClient) : null;
 export const storage = isAppwriteStorageConfigured ? new Storage(appwriteClient) : null;
 
+/**
+ * Verify that the configured Appwrite project is reachable.
+ * The startup check is intentionally a single, non-blocking request.
+ *
+ * @returns {Promise<boolean>} Whether the configured client responded.
+ */
+export async function pingAppwrite() {
+  if (!isAppwriteConfigured) {
+    return false;
+  }
+
+  await appwriteClient.ping();
+  return true;
+}
+
 export { ID };
 
 /**
