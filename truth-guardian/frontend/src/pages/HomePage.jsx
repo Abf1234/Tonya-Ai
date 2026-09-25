@@ -9,12 +9,15 @@ import {
   SearchCheck,
   ShieldAlert,
   ShieldCheck,
-  Upload,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import SystemStatus from '../components/SystemStatus';
+import ContentHint from '../components/ui/ContentHint';
+import FileDropzone, { getImageFileFromClipboard } from '../components/ui/FileDropzone';
+import PasteButton from '../components/ui/PasteButton';
+import { useToast } from '../components/ui/ToastProvider';
 
 const principles = [
   {
@@ -40,6 +43,7 @@ const scamTips = [
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [claim, setClaim] = useState('');
   const [file, setFile] = useState(null);
 
@@ -65,14 +69,17 @@ export default function HomePage() {
           className="absolute -right-36 top-12 h-96 w-96 rounded-full bg-guardian-500/20 blur-3xl"
           aria-hidden="true"
         />
-        <div className="page-shell relative grid min-h-[690px] items-center gap-12 py-20 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="page-shell relative grid min-h-[620px] items-center gap-12 py-14 sm:py-20 lg:min-h-[690px] lg:grid-cols-[1.05fr_0.95fr]">
           <div>
             <div className="mb-6 flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center gap-2 rounded-full border border-guardian-400/30 bg-guardian-400/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-guardian-200">
                 <ShieldCheck className="h-4 w-4" aria-hidden="true" />
                 Public information service
               </span>
-              <SystemStatus />
+              <SystemStatus inverse />
+               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-200">
+                 No account required
+               </span>
             </div>
             <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
               Verify Before You Share.
@@ -86,32 +93,50 @@ export default function HomePage() {
               onSubmit={handleSubmit}
               className="mt-9 rounded-2xl border border-white/15 bg-white p-3 shadow-2xl shadow-black/20 sm:p-4"
             >
-              <label htmlFor="claim" className="sr-only">
-                Message, claim or URL
-              </label>
+              <div className="flex items-center justify-between gap-3 px-1">
+                <label htmlFor="claim" className="text-sm font-extrabold text-slate-800">
+                  Message, claim or URL
+                </label>
+                <PasteButton
+                  onPaste={(text) => {
+                    setClaim(text);
+                    showToast({ message: 'Clipboard text inserted.', type: 'success', duration: 2200 });
+                  }}
+                  onUnavailable={() => showToast({ message: "Clipboard access isn't available. You can paste manually using Ctrl+V.", type: 'warning' })}
+                />
+              </div>
               <textarea
                 id="claim"
                 value={claim}
                 onChange={(event) => setClaim(event.target.value)}
+                onPaste={(event) => {
+                  const image = getImageFileFromClipboard(event.clipboardData);
+                  if (image) {
+                    event.preventDefault();
+                    setFile(image);
+                    showToast({ message: 'Screenshot attached. Review it before verifying.', type: 'info' });
+                  }
+                }}
                 rows="4"
                 placeholder="Paste a message, claim or URL"
-                className="w-full resize-none rounded-xl border-0 bg-slate-50 px-4 py-3 text-base text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-guardian-500"
+                className="mt-2 w-full resize-none rounded-xl border-0 bg-slate-50 px-4 py-3 text-base text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-guardian-500"
               />
-              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 sm:justify-start">
-                  <Upload className="h-4 w-4" aria-hidden="true" />
-                  Upload Screenshot
-                  <input
-                    type="file"
-                    className="sr-only"
-                    accept="image/png,image/jpeg,image/webp,application/pdf"
-                    onChange={(event) => setFile(event.target.files?.[0] || null)}
-                  />
-                </label>
+              <ContentHint value={claim} className="px-1" />
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <FileDropzone
+                  id="home-evidence"
+                  value={file}
+                  onChange={setFile}
+                  onError={(message) => message && showToast({ message, type: 'error' })}
+                  className="w-full sm:max-w-xs"
+                  label="Drop a screenshot or document"
+                  description="or choose a file"
+                  hint="PNG, JPEG, WebP or PDF · 10 MB maximum"
+                />
                 <button
                   type="submit"
                   disabled={!claim.trim() && !file}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-guardian-800 px-6 py-3 text-sm font-extrabold text-white transition-colors hover:bg-guardian-900 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-guardian-800 px-6 py-3 text-sm font-extrabold text-white transition-[background-color,transform] hover:bg-guardian-900 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-300 sm:self-end"
                 >
                   <SearchCheck className="h-5 w-5" aria-hidden="true" />
                   VERIFY
@@ -119,8 +144,7 @@ export default function HomePage() {
               </div>
             </form>
             <p className="mt-3 text-xs leading-5 text-slate-400">
-              Foundation preview: inputs are carried to the verification workspace but are not sent
-              to an AI service in Phase 1.
+              Public verification searches approved official records. If evidence is missing, Truth Guardian says so instead of inventing a verdict.
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -155,7 +179,7 @@ export default function HomePage() {
               </div>
               <div className="mt-6 space-y-3">
                 {[
-                  ['Status', 'OFFICIALLY CONFIRMED · UNDER REVIEW'],
+                  ['Status', 'APPROVED MATERIAL FOUND · UNVERIFIED'],
                   ['Evidence strength', 'STRONG · MODERATE · LIMITED'],
                   ['Explanation', 'Why the available evidence supports or conflicts with the claim'],
                   ['Sources', 'Direct links to the official and trusted materials reviewed'],
@@ -196,13 +220,13 @@ export default function HomePage() {
       <section className="py-20">
         <div className="page-shell">
           <div className="max-w-2xl">
-            <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-guardian-700">Live information areas</p>
+            <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-guardian-700">Public information areas</p>
             <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
               Public records will appear here only after verification and review.
             </h2>
             <p className="mt-4 text-base leading-7 text-slate-600">
-              Phase 1 does not publish demonstration incidents or pretend that source records are
-              connected.
+              Public records appear here only after verification and review. Citizen reports remain
+              separate from authoritative information.
             </p>
           </div>
           <div className="mt-10 grid gap-5 lg:grid-cols-3">
@@ -213,7 +237,10 @@ export default function HomePage() {
                 Official notices and reviewed public information will be searchable here.
               </p>
               <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
-                No source registry connected.
+                Browse the verified-information workspace for approved, currently valid official records.
+                 <Link to="/verified-information" className="mt-3 inline-flex min-h-10 items-center font-extrabold text-guardian-800 hover:underline">
+                   Browse approved records <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
+                 </Link>
               </div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
@@ -291,8 +318,7 @@ export default function HomePage() {
             <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-rose-700">Report a scam</p>
             <h2 className="mt-3 font-display text-3xl font-extrabold text-slate-950">Help protect your community</h2>
             <p className="mt-4 text-base leading-7 text-slate-600">
-              A future reporting hub will preserve reports in PostgreSQL first, even if the optional
-              Google Sheets integration is unavailable.
+The reporting hub preserves reports in PostgreSQL first, even if optional evidence processing or Google Sheets synchronization is unavailable.
             </p>
             <Link
               to="/report"

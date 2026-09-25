@@ -13,7 +13,7 @@ def test_api_root_returns_foundation_contract(api_client):
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["service"] == "Truth Guardian Sierra Leone API"
-    assert response.data["status"] == "foundation"
+    assert response.data["status"] == "public-slice"
     assert response.data["endpoints"]["liveness"].endswith("/api/health/")
     assert response.data["endpoints"]["readiness"].endswith("/api/health/ready/")
 

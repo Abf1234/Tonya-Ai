@@ -2,75 +2,99 @@
 
 **Verify Before You Share.**
 
-Truth Guardian Sierra Leone is a modular civic information platform for citizens, journalists, public servants, authorized officials and organizations. The intended platform helps people verify suspicious claims, understand official sources, identify possible scams and report suspicious activity while preserving human review and political neutrality.
+Truth Guardian Sierra Leone is a modular civic information platform for citizens,
+journalists, public servants, authorized officials and organizations. It helps people
+inspect suspicious claims, find approved official information, use an approved-source
+assistant and report suspicious activity while preserving privacy, provenance and
+human review.
 
 ## Current status
 
-The project foundation and the first Appwrite authentication slice are implemented. It intentionally does **not** simulate production integrations or advanced analysis.
+The repository now contains a working **public-slice** application rather than a
+simulated production platform. It deliberately reports unavailable integrations
+instead of inventing verification, uploads, citations, AI processing or notifications.
 
 ### Available now
 
-- Separate React + Vite frontend and Django REST API backend.
-- Responsive public shell with Home, Verify, Truth Guardian, Report, Alerts, Fact Checks, Verified Information, Trusted Sources, Learn and About routes.
-- Appwrite Web SDK configuration, email/password sign-in, session restoration, current-device sign-out, account view and safe unconfigured-state messaging.
-- Short-lived Appwrite JWT validation for future protected Django API requests; no Django user passwords or DRF Basic/Session authentication.
-- Appwrite Storage client configuration is reserved for the validated evidence workflow; public file uploads are not enabled yet.
-- Accessible verification and chat workspaces that clearly state when advanced processing is not connected.
-- Axios API client, Vite development proxy, Tailwind CSS, React Router and Recharts dependency.
-- Django health API:
-  - `GET /api/`
-  - `GET /api/health/`
-  - `GET /api/health/ready/`
-- PostgreSQL-only application settings, pgvector-ready Docker service, Redis/Celery configuration and backend service package boundaries.
-- Lite Mode preference for reduced motion and lighter browser presentation.
-- Frontend and backend automated tests.
+- Responsive React + Vite frontend with public routes for Home, Verify, Truth Guardian
+  assistant, Report, Alerts, Fact Checks, Verified Information, Trusted Sources, Learn,
+  About, account, official portal and a protected platform admin console.
+- Appwrite email/password sign-in, session restoration, current-device sign-out and
+  short-lived JWT support for explicitly protected Django requests.
+- Public PostgreSQL-backed fraud reporting with anonymous mode, validation, stable
+  idempotency keys, safe `TG-YYYY-NNNNNN` receipts, copy-reference UX and duplicate
+  submission protection.
+- Public approved-official information search/detail and an approved-source assistant.
+  The assistant always performs a deterministic database lookup, returns provenance and
+  uncertainty, and reports `ai_generated` / `ai_status` so the UI can state whether an
+  optional, disabled-by-default backend language model helped.
+- Official document submission and review workflow with server-side institution checks,
+  reviewer/institution scoping, rejection reasons, approval gates and public-record
+  status filters.
+- A platform-admin console (`/admin`, `/admin/monitoring`, `/official/admin`) with
+  aggregate monitoring counts, explicit integration states, an approved-domain URL
+  registry for a future extraction worker, and manual knowledge-base records that enter
+  the normal review queue. Registering a URL records intent only: no fetching,
+  extraction, indexing or publication is simulated.
+- Evidence selection, drag/drop, screenshot paste, PDF/image previews, local validation
+  and progress UI. File storage and malware scanning remain fail-closed until their
+  server-side dependencies are configured.
+- Shared accessible UI primitives, keyboard focus states, reduced-motion support,
+  loading/error/empty states, lazy routes and a top-level error boundary.
+- PostgreSQL-only normal settings, Appwrite authentication boundary, health endpoints,
+  backend/frontend tests and production build configuration.
 
 ### Deliberately not active yet
 
-Appwrite account registration, OAuth providers, MFA, role/RBAC enforcement, trusted-source ingestion, fraud report persistence, Google Sheets synchronization, evidence uploads, OCR, URL analysis, RAG/LLM calls, incident clustering, alerts, fact-check publication, notifications and the administrative dashboard are reserved for later phases. No API keys, source records, incidents or production results are fabricated.
+Appwrite registration/OAuth/MFA setup, private evidence storage, malware scanning, OCR,
+URL analysis, a knowledge-source extraction worker, embedding retrieval, Google Sheets
+synchronization, public incident/alert/fact-check publication feeds, notifications,
+clustering, broad analyst tools and production rate limiting are not implemented. The
+optional Hugging Face language layer is server-only, off by default, and degrades to
+the deterministic lookup. No API key, source record, incident, citation, upload,
+notification or model result is fabricated.
 
 ## Repository layout
 
 ```text
 truth-guardian/
-├── frontend/                 React + Vite application
+├── frontend/                 React + Vite public, official-portal and admin client
 │   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── layouts/
-│   │   ├── services/
-│   │   ├── hooks/
-│   │   ├── context/
-│   │   ├── utils/
-│   │   └── assets/
-│   ├── public/
 │   ├── package.json
-│   ├── vite.config.js
-│   └── README.md
-├── backend/                  Django REST API and Celery application
-│   ├── config/
+│   └── .env.example
+├── backend/                  Django REST API
 │   ├── apps/
-│   ├── services/
+│   │   ├── core/             API root, health and error envelope
+│   │   ├── accounts/         Appwrite principal and official authorization
+│   │   ├── institutions/     approved institutions and official roles
+│   │   ├── documents/        official submission/review, public info, admin console
+│   │   ├── reports/          citizen reports and receipts
+│   │   └── assistant/        approved-source lookup and optional language layer
+│   ├── services/evidence.py  fail-closed evidence boundary
 │   ├── tests/
-│   ├── manage.py
-│   ├── requirements.txt
+│   ├── config/
 │   └── .env.example
 ├── docs/
-├── .gitignore
 ├── .env.example
 └── docker-compose.yml
 ```
 
-The requested domain packages under `backend/apps/` and service packages under `backend/services/` exist as boundaries for incremental implementation. They do not yet contain domain models or integrations.
+PostgreSQL is authoritative for reports, official records and authorization data.
+Appwrite owns browser identity/session state. Appwrite Storage, Google Sheets, AI
+providers and worker services are optional future integrations and are not assumed to
+be running locally.
 
 ## Prerequisites
 
-- Node.js 20.19+ (Node 22 LTS recommended for deployment containers).
-- Python 3.11+ (Python 3.13 is supported by the current dependency set).
-- PostgreSQL 15+ with pgvector available for the full architecture.
-- Redis for Celery and future rate limiting.
-- An Appwrite project with a regional API endpoint and email/password authentication enabled.
-- Docker Desktop/Engine for the optional Compose workflow.
+- Node.js 20.19+ (Node 22 LTS recommended)
+- Python 3.11+ (the current dependency set supports Python 3.13)
+- PostgreSQL 15+ for normal application settings
+- An Appwrite project with a regional `/v1` endpoint and email/password authentication
+- Redis only if Celery/worker work is being developed
+- Docker Desktop/Engine for the optional Compose workflow
+
+The backend test settings use an isolated SQLite database for fast tests. That is not a
+production database choice; normal settings reject non-PostgreSQL databases.
 
 ## Local setup
 
@@ -81,7 +105,10 @@ cd truth-guardian/backend
 Copy-Item .env.example .env
 ```
 
-Set a unique `SECRET_KEY` in `backend/.env`, then configure a PostgreSQL `DATABASE_URL`. Do not use the example secret in a deployed environment.
+Set a unique `SECRET_KEY`, a PostgreSQL `DATABASE_URL` and the Appwrite public endpoint
+and project ID if protected official routes will be exercised. Never use the example
+secret in a deployed environment and never put `APPWRITE_SERVER_API_KEY` in a
+`VITE_*` variable.
 
 ```powershell
 python -m venv .venv
@@ -91,8 +118,6 @@ python manage.py migrate
 python manage.py runserver 127.0.0.1:8000
 ```
 
-The normal application settings require PostgreSQL. The automated test settings use an in-memory SQLite database only to keep isolated unit tests fast; this is not a production or local development database choice.
-
 ### Frontend
 
 ```powershell
@@ -101,50 +126,80 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. The Vite proxy forwards `/api` requests to `http://127.0.0.1:8000` by default. Override it with `VITE_API_PROXY_TARGET` in a local, uncommitted `frontend/.env` if needed. Set `VITE_APPWRITE_ENDPOINT` (including the regional `/v1` path) and `VITE_APPWRITE_PROJECT_ID` to enable `/login`. These are public client settings; never put an Appwrite API key in a `VITE_*` variable.
+Open `http://localhost:5173`. The Vite proxy forwards `/api` to
+`http://127.0.0.1:8000` by default. Set `VITE_APPWRITE_ENDPOINT` (including the
+regional `/v1` path) and `VITE_APPWRITE_PROJECT_ID` in an ignored local `.env` to
+exercise Appwrite sign-in. These are public client settings; never add server keys,
+database credentials or provider secrets to Vite variables.
 
 ### Optional Docker Compose
 
-After copying `backend/.env.example` to `backend/.env` and setting a secret, also copy the root `.env.example` to `.env` and set the Appwrite endpoint/project IDs there for Compose:
+After copying `backend/.env.example` to `backend/.env` and setting a unique secret,
+copy the root `.env.example` to `.env`, set the required public Appwrite identifiers,
+and run:
 
 ```powershell
 docker compose up --build
 ```
 
-Compose provisions PostgreSQL with pgvector, Redis, Django, a Celery worker and Vite. The supplied `SECURE_*` values in the Compose environment are development-only; production deployments must terminate HTTPS and use production secrets.
+Compose provides the development database/Redis/frontend tooling. Its security values
+are development-only; production deployments must terminate HTTPS and use production
+secrets.
 
 ## Validation commands
 
 ```powershell
 # Backend
 cd truth-guardian/backend
-.\.venv\Scripts\python.exe manage.py check
 .\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run --settings=config.test_settings
 
 # Frontend
 cd truth-guardian/frontend
 npm test
 npm run build
-npm audit
 ```
 
-## API foundation
+Run `manage.py check --deploy` with production environment values. A development or
+test configuration will warn about HTTPS redirects, secure cookies, HSTS and `DEBUG`
+until those values are deliberately enabled.
 
-- `GET /api/` returns service metadata and available foundation endpoints.
-- `GET /api/health/` is a liveness check and does not query the database.
-- `GET /api/health/ready/` checks PostgreSQL connectivity and returns `503` when the database is unavailable without exposing credentials or raw database errors.
+## Current API slice
 
-See [`docs/API.md`](docs/API.md) for the contract and planned endpoint boundaries.
+- `GET /api/` returns service metadata and the live route map.
+- `GET /api/health/` is a liveness check and does not query PostgreSQL.
+- `GET /api/health/ready/` checks PostgreSQL without exposing raw errors.
+- `POST /api/reports/` creates a PostgreSQL report and safe receipt; supplied evidence
+  fails honestly with `503 evidence_upload_unavailable` until the scanner/storage
+  boundary is configured.
+- `GET /api/public/verified-information/` and its detail route expose only approved,
+  current, effective, non-expired records from active verified institutions.
+- `POST /api/assistant/` and `POST /api/fact-checks/` perform the same approved-source
+  lookup, accept an optional `language`, and call a model only when the optional
+  backend provider is enabled and evidence was found.
+- `/api/official/documents/`, `/api/official/documents/review/{id}/`,
+  `/api/official/institutions/` and `/api/official/dashboard/` implement the protected
+  official workflow.
+- `/api/admin/overview/` and `/api/admin/knowledge-sources/` are restricted to approved
+  platform administrators and return aggregate monitoring data only.
+
+See [`docs/API.md`](docs/API.md) for request fields, status semantics, authorization and
+error contracts.
 
 ## Configuration and secrets
 
-Required backend variables are documented in [`backend/.env.example`](backend/.env.example) and the root [`.env.example`](.env.example). The supplied Appwrite project/database identifiers are recorded in the ignored local environment files. `APPWRITE_DATABASE_ID` is reserved for a future Appwrite table integration; PostgreSQL remains authoritative and no Appwrite database writes are enabled. `APPWRITE_SERVER_API_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_SHEET_ID`, `GOOGLE_SHEET_NAME`, `OPENAI_API_KEY`, database credentials and Redis credentials are backend/deployment secrets. They must never be placed in React source, `VITE_*` variables, public JavaScript or HTML. Appwrite's endpoint, project ID and storage bucket ID are public identifiers, not secrets.
+Backend variables are documented in [`backend/.env.example`](backend/.env.example) and
+the root [`.env.example`](.env.example). Appwrite endpoint/project/bucket identifiers
+are public configuration; the server API key, database password, Google service-account
+JSON, provider keys and Redis credentials are backend/deployment secrets. They must
+never be placed in React source, `VITE_*` variables, public JavaScript, logs, fixtures
+or documentation.
 
-The Google Sheets and AI integrations are not configured in Phase 1. Their planned failure-tolerant designs are documented in [`docs/GOOGLE_SHEETS_SETUP.md`](docs/GOOGLE_SHEETS_SETUP.md) and [`docs/AI_RAG.md`](docs/AI_RAG.md).
-
-## Development order
-
-The next implementation stages follow the requested order: finish Appwrite authentication/RBAC and trusted sources, then reporting and PostgreSQL-first Google Sheets synchronization, followed by Celery retries, admin tools, verification, RAG, chatbot, scam intelligence, clustering, advanced analysis, official portals, alerts/fact checks, security/integration testing and deployment hardening.
+The current report flow does not synchronize to Google Sheets, and the optional
+assistant language model is disabled unless `HUGGINGFACE_ENABLED=True` and a rotated
+`HUGGINGFACE_TOKEN` are configured on the server. Their status is explicit in the
+API/UI and the integration documents.
 
 ## Documentation
 

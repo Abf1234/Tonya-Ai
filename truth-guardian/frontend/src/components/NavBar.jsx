@@ -1,6 +1,6 @@
 import { Gauge, LogIn, LogOut, Menu, ShieldCheck, UserRound, X } from 'lucide-react';
-import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import { useBandwidth } from '../context/BandwidthContext';
@@ -20,7 +20,7 @@ const navigation = [
 ];
 
 function navClass({ isActive }) {
-  return `rounded-lg px-2.5 py-2 text-sm font-semibold transition-colors ${
+  return `inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 ${
     isActive
       ? 'bg-guardian-50 text-guardian-800'
       : 'text-slate-600 hover:bg-slate-100 hover:text-guardian-800'
@@ -29,6 +29,7 @@ function navClass({ isActive }) {
 
 export default function NavBar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
   const { liteMode, toggleLiteMode } = useBandwidth();
   const { loading: authLoading, signOut, user } = useAuth();
   const displayName = user?.name || user?.email || 'Account';
@@ -38,9 +39,22 @@ export default function NavBar() {
     void signOut().catch(() => {});
   };
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [menuOpen]);
+
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/90 bg-white/95 backdrop-blur">
-      <div className="page-shell flex h-18 min-h-[4.5rem] items-center justify-between gap-3 py-3">
+      <div className="page-shell flex min-h-[4.5rem] items-center justify-between gap-3 py-3">
         <Brand compact />
 
         <nav className="hidden items-center gap-0.5 xl:flex" aria-label="Main navigation">
@@ -49,6 +63,11 @@ export default function NavBar() {
               {item.label}
             </NavLink>
           ))}
+          {user ? (
+            <NavLink to="/official" className={navClass}>
+              Official Portal
+            </NavLink>
+          ) : null}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -113,14 +132,14 @@ export default function NavBar() {
       </div>
 
       {menuOpen ? (
-        <div id="mobile-navigation" className="border-t border-slate-200 bg-white xl:hidden">
+        <div id="mobile-navigation" className="animate-fade-in border-t border-slate-200 bg-white shadow-lg xl:hidden">
           <nav className="page-shell grid gap-1 py-4" aria-label="Mobile navigation">
             {navigation.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `rounded-lg px-3 py-2.5 text-sm font-semibold ${
+                  `rounded-lg min-h-11 px-3 py-2.5 text-sm font-semibold ${
                     isActive
                       ? 'bg-guardian-50 text-guardian-800'
                       : 'text-slate-700 hover:bg-slate-100'
@@ -132,6 +151,19 @@ export default function NavBar() {
                 {item.label}
               </NavLink>
             ))}
+            {user ? (
+              <NavLink
+                to="/official"
+                onClick={closeMenu}
+                className={({ isActive }) =>
+                  `rounded-lg min-h-11 px-3 py-2.5 text-sm font-semibold ${
+                    isActive ? 'bg-guardian-50 text-guardian-800' : 'text-slate-700 hover:bg-slate-100'
+                  }`
+                }
+              >
+                Official Portal
+              </NavLink>
+            ) : null}
             {authLoading ? (
               <span className="mt-2 text-center text-sm font-semibold text-slate-500">Checking session…</span>
             ) : user ? (
@@ -139,7 +171,7 @@ export default function NavBar() {
                 <NavLink
                   to="/account"
                   onClick={closeMenu}
-                  className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
+                  className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 min-h-11 px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
                 >
                   <UserRound className="h-4 w-4" aria-hidden="true" />
                   {displayName}
@@ -150,7 +182,7 @@ export default function NavBar() {
                     closeMenu();
                     handleSignOut();
                   }}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 min-h-11 px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
                 >
                   <LogOut className="h-4 w-4" aria-hidden="true" />
                   Sign out
@@ -160,7 +192,7 @@ export default function NavBar() {
               <NavLink
                 to="/login"
                 onClick={closeMenu}
-                className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg border border-guardian-300 px-3 py-2.5 text-sm font-bold text-guardian-800 hover:bg-guardian-50"
+                className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg border border-guardian-300 min-h-11 px-3 py-2.5 text-sm font-bold text-guardian-800 hover:bg-guardian-50"
               >
                 <LogIn className="h-4 w-4" aria-hidden="true" />
                 Sign in
@@ -169,7 +201,7 @@ export default function NavBar() {
             <button
               type="button"
               onClick={toggleLiteMode}
-              className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-700 sm:hidden"
+              className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 min-h-11 px-3 py-2.5 text-sm font-bold text-slate-700 sm:hidden"
               aria-pressed={liteMode}
             >
               <Gauge className="h-4 w-4" aria-hidden="true" />

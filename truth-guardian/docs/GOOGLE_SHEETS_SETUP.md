@@ -1,8 +1,21 @@
-# Google Sheets setup (planned integration)
+# Google Sheets setup (not configured)
 
-Google Sheets is an operational export for authorized staff. It is **not** the Truth Guardian database and is not required to accept a citizen report.
+Google Sheets is an optional operational export for authorized staff. It is **not** the
+Truth Guardian database and is not required to accept a citizen report.
 
-## Required backend variables
+## Current status
+
+The current API has no Google service, worker, sheet schema or active credentials.
+Reports are committed to PostgreSQL and their `google_sheets_sync_status` remains
+`NOT_CONFIGURED`. The UI does not claim that a spreadsheet append, update or retry
+occurred.
+
+A pasteable, idempotent Apps Script bootstrap is available at
+[`google-apps-script/TruthGuardianSheet.gs`](google-apps-script/TruthGuardianSheet.gs).
+It creates a safe sheet template and setup notes without deleting existing rows. It is
+a setup tool, not a public webhook or proof of live synchronization.
+
+## Required backend variables when implemented
 
 Keep these values in the backend/deployment secret store:
 
@@ -12,11 +25,14 @@ GOOGLE_SHEET_ID=
 GOOGLE_SHEET_NAME=
 ```
 
-`GOOGLE_SERVICE_ACCOUNT_JSON` should contain the service-account JSON or a secure path/reference resolved by the deployment platform. Do not paste the JSON into React, HTML, public JavaScript, source control or an issue.
+`GOOGLE_SERVICE_ACCOUNT_JSON` should contain the service-account JSON or a secure
+path/reference resolved by the deployment platform. Do not paste the JSON into React,
+HTML, public JavaScript, source control or an issue.
 
-## Spreadsheet columns
+## Proposed spreadsheet columns
 
-The future service will map PostgreSQL report fields to these columns in this order:
+A future service should use an explicitly approved, versioned schema. The currently
+documented candidate columns are:
 
 1. Report ID
 2. Date
@@ -41,11 +57,15 @@ The future service will map PostgreSQL report fields to these columns in this or
 21. Created At
 22. Updated At
 
-Private reporter information must only be included when the spreadsheet’s access controls and operational policy explicitly permit it. The public API must never serialize it.
+Private reporter information may be included only when the spreadsheet's access
+controls and operational policy explicitly permit it. The public API must never
+serialize it. The current report model does not contain every proposed operational
+column, so the schema must be reconciled before activation.
 
 ## Service boundary
 
-The future implementation belongs in `backend/services/google_sheets/google_sheets_service.py` and will expose operations such as:
+A future implementation belongs in a backend-only service and should expose operations
+such as:
 
 ```python
 append_report(report)
@@ -54,36 +74,34 @@ sync_report(report_id)
 retry_failed_sync(report_id=None)
 ```
 
-The React form will call `POST /api/reports/`; it will never call Google directly.
+The React form calls only `POST /api/reports/`; it must never call Google directly.
+Idempotency keys/report IDs should prevent duplicate rows during retries.
 
 ## Failure-tolerant sequence
 
 ```text
 Validate request
   → INSERT/transaction in PostgreSQL
-  → set google_sheet_status = PENDING
-  → return report ID/number
-  → enqueue Celery task
+  → set google_sheets_sync_status = PENDING
+  → return report ID/receipt
+  → enqueue a real worker
   → append/update Google Sheets
-  → set google_sheet_status = SYNCED
+  → set google_sheets_sync_status = SYNCED
 ```
 
-If the Google API is unavailable, the PostgreSQL transaction remains successful. The task records a safe failure, sets `FAILED` or `RETRYING` according to policy, and a scheduled Celery retry examines eligible records. A spreadsheet outage must not create a false report failure.
-
-## Suggested statuses
-
-- `PENDING`: authorized for synchronization or waiting for a worker.
-- `SYNCED`: Google confirmed the append/update.
-- `FAILED`: the last attempt failed and requires policy-based retry.
-- `RETRYING`: a retry is scheduled or in progress.
+If Google is unavailable, the PostgreSQL transaction remains successful. The future
+worker must record a safe failure and schedule policy-approved retries; a spreadsheet
+outage must not create a false report failure. No part of this sequence runs until the
+integration is configured.
 
 ## Operational safeguards
 
 - Use a dedicated Google service account with least privilege.
 - Restrict spreadsheet sharing to authorized staff.
-- Use idempotency keys/report IDs to prevent duplicate rows during retries.
-- Store a synchronization attempt log without service-account secrets.
-- Apply a queue and rate limit so a spreadsheet outage cannot exhaust workers.
-- Test append, update, unavailable credentials, quota errors, timeout, duplicate retry and partial-failure cases.
+- Validate the sheet ID/name against an allow-list.
+- Store synchronization attempt metadata without service-account secrets.
+- Apply queue, timeout and rate limits so a spreadsheet outage cannot exhaust workers.
+- Test append, update, unavailable credentials, quota errors, timeout, duplicate retry
+  and partial-failure cases before enabling the worker.
 
-No Google credentials or Sheets integration code is active in Phase 1. The current project only reserves the environment variables and service boundary.
+No Google credentials or Sheets integration code is active in the current public slice.

@@ -37,6 +37,10 @@ INSTALLED_APPS = [
     "rest_framework",
     "apps.core",
     "apps.accounts",
+    "apps.institutions",
+    "apps.documents",
+    "apps.reports",
+    "apps.assistant",
 ]
 
 MIDDLEWARE = [
@@ -122,6 +126,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_CLASSES": [],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
 }
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -159,6 +164,30 @@ GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "")
 GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "")
 
+# Optional Hugging Face Inference Providers layer for the public assistant.
+# The browser never receives this token. It stays disabled until an operator
+# deliberately enables it and configures a rotated, server-only credential.
+HUGGINGFACE_ENABLED = env_bool("HUGGINGFACE_ENABLED", False)
+HUGGINGFACE_TOKEN = (os.getenv("HUGGINGFACE_TOKEN") or os.getenv("HF_TOKEN") or "").strip()
+HUGGINGFACE_API_URL = os.getenv(
+    "HUGGINGFACE_API_URL",
+    "https://router.huggingface.co/v1/chat/completions",
+).strip()
+HUGGINGFACE_MODEL = os.getenv(
+    "HUGGINGFACE_MODEL",
+    "openai/gpt-oss-120b:fastest",
+).strip()
+HUGGINGFACE_TIMEOUT_SECONDS = max(
+    1.0,
+    min(float(os.getenv("HUGGINGFACE_TIMEOUT_SECONDS", "15")), 60.0),
+)
+HUGGINGFACE_MAX_TOKENS = max(
+    64,
+    min(int(os.getenv("HUGGINGFACE_MAX_TOKENS", "450")), 1200),
+)
+if HUGGINGFACE_API_URL and not HUGGINGFACE_API_URL.startswith("https://"):
+    raise RuntimeError("HUGGINGFACE_API_URL must use HTTPS.")
+
 # Appwrite owns browser identity and object storage. The server API key is
 # deliberately loaded only by the backend and is never exposed to Vite.
 # APPWRITE_DATABASE_ID is reserved for a future integration; PostgreSQL remains
@@ -175,6 +204,19 @@ APPWRITE_PROJECT_ID = os.getenv("APPWRITE_PROJECT_ID", "").strip()
 APPWRITE_DATABASE_ID = os.getenv("APPWRITE_DATABASE_ID", "").strip()
 APPWRITE_STORAGE_BUCKET_ID = os.getenv("APPWRITE_STORAGE_BUCKET_ID", "").strip()
 APPWRITE_SERVER_API_KEY = os.getenv("APPWRITE_SERVER_API_KEY", "").strip()
+
+# Evidence is never accepted as a successful upload until a server-side scanner
+# and a private Appwrite Storage integration are both configured. These values
+# are intentionally conservative defaults for the first live vertical slice.
+EVIDENCE_MAX_UPLOAD_BYTES = int(os.getenv("EVIDENCE_MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+EVIDENCE_ALLOWED_CONTENT_TYPES = set(
+    env_list(
+        "EVIDENCE_ALLOWED_CONTENT_TYPES",
+        "application/pdf,image/png,image/jpeg,image/webp",
+    )
+)
+EVIDENCE_SCANNING_ENABLED = env_bool("EVIDENCE_SCANNING_ENABLED", False)
+EVIDENCE_SCANNER = os.getenv("EVIDENCE_SCANNER", "").strip()
 
 LOGGING = {
     "version": 1,

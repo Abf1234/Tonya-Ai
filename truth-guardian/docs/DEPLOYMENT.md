@@ -1,24 +1,32 @@
 # Deployment
 
-This document describes the intended deployment path. Phase 1 provides Dockerfiles and a development Compose topology; no external service has been configured or claimed to be live.
+This document describes the intended deployment path. The repository provides a
+public-slice Django API and React client plus a development Compose topology; no
+external service should be treated as live unless its own health/configuration checks
+confirm it.
 
 ## Local container topology
 
-`docker-compose.yml` defines:
+`docker-compose.yml` defines a development topology for:
 
 - `db`: PostgreSQL 16 with the pgvector extension image.
-- `redis`: Redis 7 for Celery.
-- `api`: Django development server with migrations on startup.
-- `worker`: Celery worker.
+- `redis`: Redis 7 for optional Celery work.
+- `api`: Django service with migrations on startup.
+- `worker`: optional Celery worker.
 - `frontend`: Vite development server.
 
-Before running Compose, copy `backend/.env.example` to `backend/.env`, generate a unique `SECRET_KEY`, set local PostgreSQL credentials, and copy the root `.env.example` to `.env` with the public Appwrite endpoint/project variables. The backend receives the public Appwrite settings from the root Compose environment; keep the server API key in `backend/.env` or a secret manager. The key is optional until server-mediated storage or administration is enabled. Then run:
+Before running Compose, copy `backend/.env.example` to `backend/.env`, generate a
+unique `SECRET_KEY`, set local PostgreSQL credentials, and copy the root `.env.example`
+to `.env` with the public Appwrite endpoint/project variables. Keep the Appwrite server
+API key in `backend/.env` or a secret manager. The key is optional until a real
+server-mediated storage or administration integration is enabled.
 
 ```powershell
 docker compose up --build
 ```
 
-The Compose file is for development. It uses development HTTP and credentials supplied by environment variables; do not expose it directly to the internet.
+The Compose file is for development. It uses development HTTP and credentials supplied
+by environment variables; do not expose it directly to the internet.
 
 ## Native development
 
@@ -31,24 +39,41 @@ The Compose file is for development. It uses development HTTP and credentials su
 npm run dev
 ```
 
-Gunicorn is included for Linux deployment. It depends on Unix `fcntl` and is not a Windows development server; use Django’s runserver on Windows.
+Gunicorn is included for Linux deployment. It depends on Unix `fcntl` and is not a
+Windows development server; use Django's `runserver` on Windows.
 
 ## Production components
 
-- **Frontend:** build `frontend/` on Vercel, Netlify or another static host. Set only public Vite variables and route `/api` to the backend origin.
-- **Backend:** deploy `backend/` as a Django WSGI service on Render, Railway or a comparable platform using Gunicorn/uWSGI and a supported Linux runtime.
-- **Database:** use managed PostgreSQL with pgvector enabled, TLS, automated backups and connection pooling.
-- **Worker:** run a separate Celery worker process using the same code release and environment.
-- **Broker:** use private Redis with authentication, TLS where supported and restricted network access.
-- **Appwrite:** use a managed Appwrite Cloud project or a separately secured self-hosted instance. Register the production web platform, configure email/password and allowed origins, prefer a custom API domain for cookie-based session security, and keep the server API key in the platform secret manager.
-- **Evidence storage:** use a private Appwrite Storage bucket with server-mediated validation, malware scanning and short-lived access URLs.
-- **Secrets:** use the platform secret manager; never put Appwrite server keys, Google, OpenAI, database or Redis credentials in frontend environment variables.
+- **Frontend:** build `frontend/` on a static host or CDN. Set only public Vite
+  variables and route `/api` to the backend origin.
+- **Backend:** deploy `backend/` as a Django WSGI service on a supported Linux runtime
+  using Gunicorn/uWSGI.
+- **Database:** use managed PostgreSQL with TLS, automated backups and connection
+  pooling. The application rejects non-PostgreSQL normal configurations.
+- **Identity:** use a secured Appwrite Cloud project or self-hosted instance, register
+  production origins, configure email verification/MFA/session limits and keep the
+  server key in a secret manager.
+- **Evidence storage:** use a private Appwrite Storage bucket only after server-side
+  validation, malware scanning and access-audit controls are deployed.
+- **Workers/broker:** run Celery and private Redis only for features that have real
+  workers and retry/audit policies. The current public slice does not claim that a
+  Sheets, OCR or evidence worker ran.
+- **Secrets:** never put Appwrite server keys, Google, Hugging Face, database or Redis
+  credentials in frontend environment variables.
+- **Optional assistant model:** set `HUGGINGFACE_ENABLED`, `HUGGINGFACE_TOKEN`,
+  `HUGGINGFACE_API_URL` and `HUGGINGFACE_MODEL` only in the server/secret store. Leave
+  the flag off unless a rotated token is available; the assistant degrades to the
+  deterministic approved-source lookup when the provider is disabled, unreachable or
+  returns an unusable response.
+- **Admin console:** `/admin` requires an approved `ADMIN`/`SUPER_ADMIN` row. Restrict
+  it to real staff accounts, enable MFA for those accounts, and keep a deployment-level
+  access log. The console returns aggregate counts only and is served `no-store`.
 
 ## Release sequence
 
-1. Build and scan the frontend and backend images.
+1. Build and scan frontend/backend artifacts.
 2. Apply migrations using a one-off release job.
-3. Start the API and worker.
+3. Start the API and any explicitly enabled workers.
 4. Run liveness and readiness checks.
 5. Deploy the frontend and verify the browser/API boundary.
 6. Run smoke, integration, permission and security tests.
@@ -58,4 +83,9 @@ Gunicorn is included for Linux deployment. It depends on Unix `fcntl` and is not
 
 - `GET /api/health/` checks process liveness.
 - `GET /api/health/ready/` checks database connectivity.
-- A failed readiness check should remove an instance from traffic without exposing database error details.
+- A failed readiness check should remove an instance from traffic without exposing
+  database error details.
+
+A production `check --deploy` should be run with HTTPS, secure cookies, HSTS and
+`DEBUG=False` configured deliberately. Do not enable HSTS until all covered hosts are
+HTTPS-only.

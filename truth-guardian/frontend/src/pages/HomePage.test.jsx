@@ -30,7 +30,7 @@ describe('HomePage', () => {
     expect(
       screen.getByText(/Check suspicious claims, government announcements, scams/i),
     ).toBeInTheDocument();
-    expect(await screen.findByText('API foundation online')).toBeInTheDocument();
+    expect(await screen.findByText('API online')).toBeInTheDocument();
   });
 
   it('enables verification only when input is provided', async () => {
@@ -43,6 +43,6 @@ describe('HomePage', () => {
     expect(verifyButton).toBeDisabled();
     await user.type(input, 'Is this recruitment message genuine?');
     expect(verifyButton).toBeEnabled();
-    expect(await screen.findByText('API foundation online')).toBeInTheDocument();
+    expect(await screen.findByText('API online')).toBeInTheDocument();
   });
 });

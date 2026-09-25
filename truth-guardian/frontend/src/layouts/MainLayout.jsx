@@ -1,7 +1,9 @@
 import { Outlet } from 'react-router-dom';
 
+import AssistantLauncher from '../components/AssistantLauncher';
 import Footer from '../components/Footer';
 import NavBar from '../components/NavBar';
+import PageTransition from '../components/ui/PageTransition';
 
 export default function MainLayout() {
   return (
@@ -14,9 +16,12 @@ export default function MainLayout() {
       </a>
       <NavBar />
       <main id="main-content" className="flex-1">
-        <Outlet />
+        <PageTransition>
+          <Outlet />
+        </PageTransition>
       </main>
       <Footer />
+      <AssistantLauncher />
     </div>
   );
 }

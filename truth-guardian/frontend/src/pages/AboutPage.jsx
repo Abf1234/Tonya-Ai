@@ -48,9 +48,9 @@ export default function AboutPage() {
             <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-guardian-700">Our commitment</p>
             <h2 className="mt-3 font-display text-3xl font-extrabold text-slate-950">Verify Before You Share.</h2>
             <p className="mt-5 text-base leading-7 text-slate-600">
-              The foundation separates authoritative evidence from operational and administrative
-              systems so that the same APIs can support a future public website, mobile application,
-              WhatsApp interface, official portal and administration tools.
+              The platform separates authoritative evidence from operational and administrative
+              systems so that the same APIs can support the public website and future clients without
+              duplicating business rules.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -87,8 +87,9 @@ export default function AboutPage() {
             <div className="max-w-2xl">
               <h2 className="font-display text-3xl font-extrabold">Start with a cautious check</h2>
               <p className="mt-3 text-base leading-7 text-guardian-100">
-                Phase 1 provides the public application foundation. Verification processing is clearly
-                marked as not yet connected rather than simulated.
+                Public verification currently searches approved, currently valid official records. Richer
+                extraction, AI analysis and operational integrations remain explicitly marked as unavailable
+                rather than simulated.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">

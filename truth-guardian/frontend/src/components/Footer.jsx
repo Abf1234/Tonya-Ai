@@ -4,6 +4,7 @@ import Brand from './Brand';
 
 const footerLinks = [
   { label: 'Verify information', to: '/verify' },
+  { label: 'Ask Truth Guardian', to: '/truth-guardian' },
   { label: 'Report suspicious activity', to: '/report' },
   { label: 'Public alerts', to: '/alerts' },
   { label: 'Scam education', to: '/learn' },
@@ -23,13 +24,14 @@ export default function Footer() {
           <p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-guardian-300">
             Verify Before You Share.
           </p>
+          <p className="mt-3 text-xs leading-5 text-slate-400">Public verification, chat and fraud reporting do not require an account.</p>
         </div>
         <div>
           <h2 className="text-sm font-bold text-white">Platform</h2>
           <ul className="mt-4 grid gap-3 text-sm">
             {footerLinks.map((link) => (
               <li key={link.to}>
-                <Link className="hover:text-guardian-300" to={link.to}>
+                <Link className="inline-flex min-h-11 items-center hover:text-guardian-300" to={link.to}>
                   {link.label}
                 </Link>
               </li>

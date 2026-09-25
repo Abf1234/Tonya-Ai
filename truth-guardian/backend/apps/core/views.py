@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-API_VERSION = "0.1.0"
+API_VERSION = "0.2.0"
 
 
 @api_view(["GET"])
@@ -14,11 +14,17 @@ def api_root(request):
         {
             "service": "Truth Guardian Sierra Leone API",
             "version": API_VERSION,
-            "status": "foundation",
+            "status": "public-slice",
             "documentation": "/docs/API.md",
             "endpoints": {
                 "liveness": reverse("health-liveness"),
                 "readiness": reverse("health-readiness"),
+                "public_fraud_reports": reverse("public-fraud-report-create"),
+                "public_verified_information": reverse("public-verified-information-list"),
+                "public_assistant": reverse("public-assistant"),
+                "public_fact_check": reverse("public-fact-check"),
+                "official_documents": reverse("official-documents"),
+                "official_dashboard": reverse("official-dashboard"),
             },
         }
     )

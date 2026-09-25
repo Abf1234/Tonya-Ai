@@ -1,61 +1,56 @@
-import { FileText, Info, Link2, SearchCheck, ShieldCheck, Upload, X } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Info, SearchCheck, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
-const acceptedTypes = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
-const maximumFileSize = 5 * 1024 * 1024;
+import { askPublicAssistant, getApiErrorMessage } from '../services/api';
+import ContentHint from '../components/ui/ContentHint';
+import FileDropzone, { getImageFileFromClipboard } from '../components/ui/FileDropzone';
+import PasteButton from '../components/ui/PasteButton';
+import Alert from '../components/ui/Alert';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import EvidenceStrength, { VerificationStatus } from '../components/ui/EvidenceStrength';
+import SourceCard from '../components/ui/SourceCard';
+import { useToast } from '../components/ui/ToastProvider';
 
 export default function VerifyPage() {
   const location = useLocation();
-  const fileInput = useRef(null);
+  const { showToast } = useToast();
   const initialFile = location.state?.initialFile || null;
   const [text, setText] = useState(location.state?.initialText || '');
   const [file, setFile] = useState(initialFile);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
 
-  const fileSummary = useMemo(() => {
-    if (!file) return null;
-    return `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
-  }, [file]);
-
-  const selectFile = (selectedFile) => {
-    setNotice('');
+  const handleFileChange = (nextFile) => {
+    setFile(nextFile);
+    setResult(null);
     setError('');
-
-    if (!selectedFile) {
-      setFile(null);
-      return;
-    }
-
-    if (!acceptedTypes.includes(selectedFile.type)) {
-      setError('Use a PNG, JPEG, WebP image or a PDF document.');
-      setFile(null);
-      return;
-    }
-
-    if (selectedFile.size > maximumFileSize) {
-      setError('The selected file is larger than the 5 MB foundation limit.');
-      setFile(null);
-      return;
-    }
-
-    setFile(selectedFile);
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
+    setResult(null);
 
-    if (!text.trim() && !file) {
-      setError('Enter a claim, message, URL, or choose a supported file.');
+    if (!text.trim()) {
+      setError(file ? 'Enter the claim or message. File analysis is not connected yet.' : 'Enter a claim, message, or URL.');
       return;
     }
 
-    setNotice(
-      'The Phase 1 workspace received your selection, but no content was uploaded and no AI provider was called. Verification processing will be connected in a later phase.',
-    );
+    setSubmitting(true);
+    try {
+      const response = await askPublicAssistant(text.trim());
+      setResult(response);
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Verification is temporarily unavailable. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const resultStatus = result?.status === 'evidence_found' ? 'evidence_found' : result?.status || 'not_verified';
 
   return (
     <div className="bg-slate-50 py-12 sm:py-16">
@@ -64,128 +59,160 @@ export default function VerifyPage() {
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full bg-guardian-100 px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.16em] text-guardian-800">
               <SearchCheck className="h-4 w-4" aria-hidden="true" />
-              Verification workspace
+              Public verification
             </div>
             <h1 className="mt-5 font-display text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl">
               What would you like to verify?
             </h1>
             <p className="mt-4 text-base leading-7 text-slate-600">
-              Submit a message, claim, URL, screenshot or supported document. Serious claims will
-              require evidence review and may require human approval.
+              Search a claim against approved, currently valid official records. The result distinguishes evidence found from a claim that could not be verified.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-9 rounded-3xl border border-slate-200 bg-white p-5 shadow-soft sm:p-8">
-            <div className="grid gap-7 lg:grid-cols-[1fr_0.42fr]">
-              <div>
-                <label htmlFor="verification-text" className="text-sm font-extrabold text-slate-900">
-                  Message, claim or URL
-                </label>
-                <p className="mt-1 text-sm text-slate-500">Include enough context to understand the claim.</p>
-                <textarea
-                  id="verification-text"
-                  value={text}
-                  onChange={(event) => {
-                    setText(event.target.value);
-                    setNotice('');
-                  }}
-                  rows="10"
-                  placeholder="Paste the exact wording or URL you received..."
-                  className="mt-4 w-full resize-y rounded-2xl border border-slate-300 bg-white px-4 py-4 text-base text-slate-900 placeholder:text-slate-400 focus:border-guardian-500 focus:ring-2 focus:ring-guardian-200"
-                />
-              </div>
-              <div>
-                <span className="text-sm font-extrabold text-slate-900">Supporting file</span>
-                <p className="mt-1 text-sm text-slate-500">PNG, JPEG, WebP or PDF, up to 5 MB.</p>
-                <button
-                  type="button"
-                  onClick={() => fileInput.current?.click()}
-                  className="mt-4 flex min-h-44 w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center hover:border-guardian-400 hover:bg-guardian-50"
-                >
-                  <Upload className="h-7 w-7 text-guardian-700" aria-hidden="true" />
-                  <span className="mt-3 text-sm font-extrabold text-slate-800">Choose a file</span>
-                  <span className="mt-1 text-xs text-slate-500">or take a clear screenshot</span>
-                </button>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  className="sr-only"
-                  accept=".png,.jpg,.jpeg,.webp,.pdf,image/png,image/jpeg,image/webp,application/pdf"
-                  onChange={(event) => selectFile(event.target.files?.[0] || null)}
-                />
-                {fileSummary ? (
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-guardian-50 p-3 text-left">
-                    <div className="min-w-0">
-                      <FileText className="mb-1 h-4 w-4 text-guardian-700" aria-hidden="true" />
-                      <p className="truncate text-xs font-bold text-guardian-900">{file.name}</p>
-                      <p className="mt-0.5 text-xs text-guardian-700">{fileSummary.split(' · ')[1]}</p>
+          <Card className="mt-9 p-5 shadow-soft sm:p-8" interactive={false}>
+            <form onSubmit={handleSubmit}>
+              <div className="grid gap-7 lg:grid-cols-[1fr_0.42fr]">
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <label htmlFor="verification-text" className="text-sm font-extrabold text-slate-900">
+                        Message, claim or URL
+                      </label>
+                      <p className="mt-1 text-sm text-slate-500">Include enough context to understand the claim.</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFile(null);
-                        if (fileInput.current) fileInput.current.value = '';
+                    <PasteButton
+                      onPaste={(value) => {
+                        setText(value);
+                        setResult(null);
+                        setError('');
+                        showToast({ message: 'Clipboard text inserted.', type: 'success', duration: 2200 });
                       }}
-                      className="rounded-md p-1 text-guardian-800 hover:bg-guardian-100"
-                      aria-label="Remove selected file"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                      onUnavailable={() => showToast({ message: "Clipboard access isn't available. You can paste manually using Ctrl+V.", type: 'warning' })}
+                    />
                   </div>
-                ) : null}
+                  <textarea
+                    id="verification-text"
+                    value={text}
+                    onChange={(event) => {
+                      setText(event.target.value);
+                      setResult(null);
+                      setError('');
+                    }}
+                    onPaste={(event) => {
+                      const image = getImageFileFromClipboard(event.clipboardData);
+                      if (image) {
+                        event.preventDefault();
+                        handleFileChange(image);
+                        showToast({ message: 'Screenshot attached locally. File analysis is not connected yet.', type: 'info' });
+                      }
+                    }}
+                    rows="10"
+                    placeholder="Paste the exact wording or URL you received..."
+                    className="mt-4 w-full resize-y rounded-2xl border border-slate-300 bg-white px-4 py-4 text-base text-slate-900 placeholder:text-slate-400 focus:border-guardian-500 focus:ring-2 focus:ring-guardian-200"
+                  />
+                  <ContentHint value={text} />
+                </div>
+                <div>
+                  <span className="text-sm font-extrabold text-slate-900">Supporting file</span>
+                  <p className="mt-1 text-sm text-slate-500">PNG, JPEG, WebP or PDF, up to 10 MB.</p>
+                  <FileDropzone
+                    id="verification-file"
+                    value={file}
+                    onChange={handleFileChange}
+                    onError={setError}
+                    className="mt-4"
+                    label="Drop evidence here"
+                    description="Choose a file or paste a screenshot"
+                    hint="File analysis will be enabled after private scanning is configured"
+                  />
+                </div>
               </div>
-            </div>
 
-            {error ? (
-              <p className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {notice ? (
-              <div className="mt-5 flex gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900" role="status">
-                <Info className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
-                {notice}
+              {error ? (
+                <Alert tone="error" className="mt-5" onDismiss={() => setError('')}>
+                  {error}
+                </Alert>
+              ) : null}
+
+              <div className="mt-7 flex flex-col gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                <p className="flex items-center gap-2 text-xs leading-5 text-slate-500">
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-guardian-700" aria-hidden="true" />
+                  No account is required. Citizen reports are not treated as facts.
+                </p>
+                <Button type="submit" size="lg" loading={submitting} disabled={submitting}>
+                  <SearchCheck className="h-5 w-5" aria-hidden="true" />
+                  {submitting ? 'Checking approved sources…' : 'Check claim'}
+                </Button>
               </div>
-            ) : null}
+            </form>
+          </Card>
 
-            <div className="mt-7 flex flex-col gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <p className="flex items-center gap-2 text-xs leading-5 text-slate-500">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-guardian-700" aria-hidden="true" />
-                Personal information should not be included unless necessary.
-              </p>
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-guardian-800 px-6 py-3 text-sm font-extrabold text-white hover:bg-guardian-900"
-              >
-                <SearchCheck className="h-5 w-5" aria-hidden="true" />
-                Check submission
-              </button>
-            </div>
-          </form>
+          {submitting ? (
+            <Card className="mt-8 p-6" aria-label="Verification in progress">
+              <div className="flex items-center gap-3 text-sm font-bold text-slate-700" role="status">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-guardian-50 text-guardian-700">
+                  <span className="h-3 w-3 animate-breathe rounded-full bg-guardian-500" />
+                </span>
+                Truth Guardian is checking available approved evidence…
+              </div>
+              <div className="mt-5 space-y-3" aria-hidden="true">
+                <div className="skeleton h-4 w-1/3 rounded-full" />
+                <div className="skeleton h-4 w-4/5 rounded-full" />
+                <div className="skeleton h-4 w-2/3 rounded-full" />
+              </div>
+            </Card>
+          ) : null}
+
+          {result ? (
+            <section className="mt-8 animate-fade-up" aria-live="polite">
+              <Card className="p-6 shadow-soft sm:p-8">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-guardian-700">Evidence result</p>
+                    <h2 className="mt-2 font-display text-2xl font-extrabold text-slate-950">
+                      {result.status === 'evidence_found' ? 'Approved material found' : 'Could not verify this claim'}
+                    </h2>
+                  </div>
+                  <div className="flex flex-col items-start gap-2 sm:items-end">
+                    <VerificationStatus status={resultStatus} />
+                    <EvidenceStrength strength={result.evidence_strength} compact />
+                  </div>
+                </div>
+                <p className="mt-4 animate-fade-in text-sm leading-7 text-slate-700" style={{ animationDelay: '80ms' }}>{result.answer}</p>
+                {result.evidence?.length ? (
+                  <div className="mt-6 animate-fade-up space-y-3" style={{ animationDelay: '140ms' }}>
+                    {result.evidence.map((source) => (
+                      <SourceCard key={source.id} source={source} />
+                    ))}
+                  </div>
+                ) : (
+                  <Alert tone="warning" className="mt-6">
+                    No matching approved record is available. This is not a declaration that the claim is false; it means the current registry cannot substantiate it.
+                  </Alert>
+                )}
+                <p className="mt-5 flex animate-fade-in items-start gap-2 text-xs leading-5 text-slate-500" style={{ animationDelay: '220ms' }}>
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {result.limitations}
+                </p>
+              </Card>
+            </section>
+          ) : null}
 
           <div className="mt-8 grid gap-5 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <Link2 className="h-6 w-6 text-blue-700" aria-hidden="true" />
-              <h2 className="mt-4 font-display text-lg font-extrabold">Planned result statuses</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                The final interface will distinguish official confirmation, support, uncertainty,
-                disputes, misleading content, scams and review—not only true or false.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <Card className="p-6" interactive>
               <ShieldCheck className="h-6 w-6 text-guardian-700" aria-hidden="true" />
               <h2 className="mt-4 font-display text-lg font-extrabold">Evidence, not intuition</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Every future assessment must show evidence strength, an explanation, source links
-                and relevant uncertainty.
+                Results link to the underlying institution record and show its publication and validity dates.
               </p>
-            </div>
-          </div>
-
-          <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950">
-            <strong>Foundation limitation:</strong> this page intentionally does not call an AI
-            provider, scrape a website, perform OCR, or save a verification record. Those services
-            must be implemented and tested before they are presented as operational.
+            </Card>
+            <Card className="p-6" interactive>
+              <Info className="h-6 w-6 text-blue-700" aria-hidden="true" />
+              <h2 className="mt-4 font-display text-lg font-extrabold">Uncertainty is explicit</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                If approved evidence is missing or conflicting, Truth Guardian will not manufacture a verdict or citation.
+              </p>
+            </Card>
           </div>
         </div>
       </div>

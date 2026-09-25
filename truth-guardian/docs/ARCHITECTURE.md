@@ -1,97 +1,183 @@
 # Architecture
 
-## System boundary
+## Current system boundary
 
-Truth Guardian is a modular platform. The public website, future mobile application, WhatsApp interface, official portal and administrative tools should use the same versioned Django REST APIs rather than duplicate business logic in clients.
+Truth Guardian is a modular civic-tech platform. The current repository contains a
+React/Vite browser client and a Django REST API. PostgreSQL is authoritative for
+platform records. Appwrite owns browser identity and sessions; Django validates a
+short-lived Appwrite JWT and then applies server-side official authorization.
 
 ```text
-Public users
-     │
-     ├── Verify ─┐
-     ├── Chat ───┼── React / future clients ── Django REST API
-     └── Report ─┘                              │
-                   │                            ├── PostgreSQL + pgvector
-                   │                            ├── Trusted sources and documents
-                   │                            ├── Verification/RAG services
-                   │                            ├── Scam intelligence
-                   │                            └── Celery + Redis workers
-                   │                                      │
-                   │                                      └── Google Sheets (operational export)
-                   │
-                   └── Appwrite Auth + Appwrite Storage
+Browser (React/Vite)
+  ├─ public verification / assistant
+  ├─ public fraud reporting
+  ├─ approved official information
+  ├─ official portal
+  └─ platform admin console
+          │
+          ├─ Appwrite Account + session (browser only)
+          │          └─ short-lived JWT ───────────────┐
+          └───────────────────────────────────────────┤
+                                                      ▼
+                                               Django REST API
+                                                ├─ public records
+                                                ├─ reports/receipts
+                                                ├─ approved-source lookup
+                                                ├─ optional assistant language layer
+                                                ├─ official review workflow
+                                                └─ admin monitoring + source registry
+                                                      │
+                                                      ▼
+                                                  PostgreSQL
 ```
+
+The frontend and API are deliberately split so a future mobile, messaging or
+partner client can use the same contracts without duplicating business rules.
 
 ## Runtime components
 
 ### Frontend
 
-- React and Vite provide a separate browser application.
-- React Router owns public route navigation.
-- The Appwrite Web SDK owns browser account/session state; the current email/password sign-in flow uses `Account.createEmailPasswordSession()` and restores the session with `Account.get()`. Registration remains reserved for a later phase.
-- Axios is the only HTTP client boundary and keeps API configuration centralized. Protected calls opt into a short-lived Appwrite JWT; public calls do not request a token.
-- Tailwind CSS provides responsive styling.
-- Recharts is installed for future administration analytics.
-- Lite Mode is a client preference that reduces motion and visual weight.
+- React, Vite, React Router, Tailwind CSS and `lucide-react` provide the browser app.
+- Appwrite Web SDK owns account/session restoration and sign-in. Appwrite server API
+  keys are never read by Vite.
+- Axios is the HTTP boundary. Public calls do not request an Appwrite JWT; protected
+  official calls opt into a short-lived JWT.
+- Routes for public verification, assistant, reporting, approved information, alerts,
+  fact checks, sources, learning, the official portal and the platform admin console
+  are available. Lazy-loaded pages, accessible focus states, reduced-motion styles,
+  loading/error/empty states and a top-level error boundary are in the shared UI layer.
+- The client presents evidence strength and source provenance, not an absolute truth
+  score. It only uses a “Verified source” label for explicit backend verification
+  metadata.
+- The assistant UI labels optional AI wording with the backend's `ai_status`, exposes a
+  language selector (`auto`, `en`, `krio`, `mende`, `temne`, `limba`), and states the
+  model's limitations instead of implying fluency or authority.
 
 ### Backend
 
-- Django provides configuration, admin foundation and URL routing.
-- Django REST Framework exposes JSON APIs.
-- `apps.core` currently owns the API root and health contract.
-- Domain packages are separated for accounts, institutions, sources, documents, verification, reports, incidents, indicators, chatbot, fact checks, alerts, analytics, notifications and audit logs.
-- `config.celery` is configured for background tasks; domain tasks will be added with the reports and ingestion phases.
+- Django and Django REST Framework provide settings, URL routing, authentication
+  boundary, serializers, permissions and error envelopes.
+- `apps.core` owns API metadata and health checks.
+- `apps.accounts` validates Appwrite principals and server-side official roles.
+- `apps.institutions` stores manually approved institutions and official-user records.
+- `apps.documents` stores reviewed official documents and exposes public information
+  plus the scoped official submission/review queue.
+- `apps.reports` stores citizen reports and safe receipts in PostgreSQL.
+- `apps.assistant` implements a deterministic lookup against approved official
+  documents, plus an optional, disabled-by-default backend-only provider layer that
+  can only rephrase retrieved excerpts.
+- `apps.core` also owns the shared error envelope used by every handler and manual
+  error response.
+- The API defaults to authenticated access; public views opt into `AllowAny`
+  explicitly.
 
 ### Data and integrations
 
-- PostgreSQL is the authoritative system of record for reports, evidence metadata and platform records.
-- Appwrite Auth is the identity/session provider. Django does not create a parallel user password store.
-- Appwrite Storage is the planned private object store for evidence. PostgreSQL stores file IDs and metadata; the browser will not bypass server-side validation/scanning.
-- pgvector is provisioned in the development database image for future embedding retrieval.
-- Redis is the Celery broker/result backend and will support future rate limiting and caching.
-- Google Sheets is an operational/reporting export. It is never the source of truth.
-- AI providers are called only by backend services. Browser code receives structured results and citations, never provider credentials.
+- PostgreSQL stores reports, document metadata, institution approvals and public
+  record content. It is the system of record.
+- Appwrite Auth is the identity/session provider. Django does not create a parallel
+  password store for API users.
+- Appwrite Storage is reserved for private evidence. In the current configuration,
+  evidence is accepted only after a server-side scanner and private storage boundary
+  are configured. With the default configuration, a supplied file receives a truthful
+  `503 evidence_upload_unavailable` response.
+- Redis/Celery settings exist for future workers, but no current report, extraction or
+  synchronization worker claims to have run.
+- Google Sheets is an optional operational export. No service-account credentials,
+  sheet schema or sync worker is configured, so report sync state is
+  `NOT_CONFIGURED`.
+- No embedding pipeline or vector index is configured. The assistant searches approved
+  PostgreSQL records directly and reports `ai_generated: false` unless the optional
+  backend provider is deliberately enabled, in which case it reports
+  `ai_generated: true` with an explicit `ai_status` and the same source cards.
+- A `KnowledgeSource` row records an approved URL for future review only. No worker
+  fetches, extracts or indexes it, so `processing_status` stays `NOT_CONFIGURED`.
 
-## Request and reporting principles
+## Request flows
 
-### Verification
+### Approved-source verification and assistant
 
 ```text
-Input
-  → content extraction
-  → claim extraction
-  → entity extraction
-  → scoped source search
-  → evidence retrieval
-  → comparison
-  → assessment
-  → citations
-  → result
+Text claim (+ optional language selection)
+  → Django validation
+  → title/description/body match against approved, current documents
+  → source metadata and short excerpt (if found)
+  → optional backend provider rephrasing (disabled by default)
+  → redaction, URL allowlisting and reference cleanup
+  → evidence_found or not_verified response with ai_generated / ai_status
+  → React result with status, limitations and provenance
 ```
 
-The pipeline must represent uncertainty. A result can be `UNVERIFIED`, `DISPUTED`, `POTENTIALLY MISLEADING`, `POTENTIAL SCAM`, `INSUFFICIENT EVIDENCE` or `UNDER REVIEW` rather than forcing a binary answer.
+A result means that matching approved material was found. It does not mean that a
+claim is absolutely true, current in every context, or supported by an unconfigured
+model. Citizen reports are not treated as facts and are not included in the assistant
+search.
+
+### Platform admin console
+
+```text
+Admin signs in (Appwrite session)
+  → GET /api/admin/overview/ (aggregate counts + integration states)
+  → GET /api/admin/knowledge-sources/ (registry, max 100)
+  → POST /api/admin/knowledge-sources/ (HTTPS + verified-domain allowlist)
+  → manual knowledge record via POST /api/official/documents/ (PENDING_REVIEW)
+  → no report text, contact details or private fields are returned
+```
+
+Every admin request requires a valid Appwrite JWT plus an approved server-side
+`ADMIN`/`SUPER_ADMIN` record, and is served with `Cache-Control: no-store`. Adding a
+URL records review intent; it never triggers a fetch, extraction, index build or
+publication.
 
 ### Fraud reporting
 
 ```text
 React form
-  → POST /api/reports/
-  → Django validation and authorization
-  → PostgreSQL transaction
-  → return report ID/number
-  → enqueue Celery synchronization
-  → Google Sheets
+  → POST /api/reports/ (optional Idempotency-Key)
+  → DRF field validation
+  → optional evidence validation
+  → PostgreSQL report transaction
+  → safe receipt (TG-YYYY-NNNNNN)
+  → no Sheets or provider synchronization in this slice
 ```
 
-If Google Sheets is unavailable, the committed PostgreSQL report remains available and its synchronization state is `PENDING` or `FAILED` for retry. A report is never discarded because an external spreadsheet is down.
+A report is committed to PostgreSQL before any optional downstream work. Anonymous
+reports discard optional contact details before persistence. The receipt contains a
+reference, status, timestamp and evidence-processing status; it never exposes contact
+information or provider IDs.
 
-## Source trust model
+### Official content and human review
 
-A source is trusted for a defined scope, not universally. Registry records will include source type, verification level, scope, active state, last verification and last check dates. Official accounts and domains will be linked to the responsible institution and verification evidence. Unknown domains will be described as unverified, not automatically malicious.
+1. An approved official submits a manual-text or verified-domain document.
+2. The document is stored as `PENDING_REVIEW`; it is not public.
+3. A reviewer in the same institution (or a platform admin) reviews it under a database
+   lock. Cross-institution review is denied in both the view and service layer.
+4. Approval requires active verified institution state, a non-expired date and
+   available/manual text. A rejection requires a reason.
+5. Only approved, published, current, effective and non-expired records from active
+   verified institutions are returned by public information and assistant queries.
 
-## Human review and neutrality
+No current endpoint fetches a source URL, extracts a PDF, calls OCR, performs URL
+analysis, or simulates a malware scan. A future ingestion worker must be explicit
+about each of those operations and retain provenance/audit metadata.
 
-AI may assist extraction, retrieval, clustering and analyst summaries. Human administrators remain responsible for criminal accusations, serious allegations, government officials, political claims, national emergencies, major financial schemes and conflicting official sources. The platform will not rank candidates or political actors and will not use political persuasion.
+## Trust and neutrality model
 
-## Planned deployment topology
+Trust is scoped: an approved government domain supports a particular institution and
+source type, not every claim on the public web. Unknown domains and citizen reports are
+described as unverified or non-authoritative rather than automatically fraudulent.
 
-A production topology should use a managed PostgreSQL instance with pgvector, a private Redis instance, an Appwrite project (cloud or self-hosted), a Django API service, one or more Celery workers, a scheduled retry task, Appwrite Storage for evidence, and a CDN/edge-hosted React build. Health checks, structured logs, metrics, backups, secret management and audit retention belong in the deployment plan.
+Serious allegations, criminal accusations, officials, emergencies, political claims
+and major financial schemes require human review and auditability. The platform does
+not rank political actors or provide political persuasion. It preserves conflicting
+sources and uncertainty when future retrieval expands the evidence set.
+
+## Deployment shape
+
+A production deployment should use managed PostgreSQL, a private Appwrite project and
+private storage bucket, a Django API, a CDN/edge-hosted frontend build, a supported
+malware scanner, and a managed worker system for extraction and retries once those
+features are enabled. HTTPS, secure cookies, HSTS, CSP, rate limits, audit retention,
+backups, secret management, database TLS and monitoring belong in the deployment
+configuration. The current local test configuration is not a production deployment.
